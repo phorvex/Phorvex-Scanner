@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PHORVEX SCANNER</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0a0a; color: #00ff88; font-family: 'Courier New', monospace; padding: 20px; }
+        h1 { text-align: center; font-size: 2.8em; letter-spacing: 10px; margin-bottom: 5px; color: #00ff88; text-shadow: 0 0 30px #00ff88; }
+        .subtitle { text-align: center; color: #555; margin-bottom: 6px; letter-spacing: 4px; font-size: 0.9em; }
+        .tagline { text-align: center; color: #00ff8877; margin-bottom: 25px; font-size: 0.85em; }
+        .stats { display: flex; gap: 20px; margin-bottom: 20px; }
+        .stat { background: #111; border: 1px solid #00ff8844; border-radius: 8px; padding: 20px 25px; flex: 1; text-align: center; }
+        .stat .num { font-size: 2.8em; color: #00ff88; font-weight: bold; }
+        .stat .label { font-size: 0.85em; color: #666; letter-spacing: 3px; margin-top: 4px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        .panel { background: #111; border: 1px solid #00ff8844; border-radius: 8px; padding: 20px; max-height: 450px; overflow-y: auto; }
+        .panel h2 { font-size: 1.1em; letter-spacing: 4px; margin-bottom: 15px; color: #00ff88; border-bottom: 1px solid #00ff8833; padding-bottom: 10px; position: sticky; top: 0; background: #111; }
+        .panel.ble { border-color: #4444ff44; }
+        .panel.ble h2 { color: #6699ff; }
+        .device { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #ffffff11; }
+        .device .ssid { color: #fff; font-size: 1em; font-weight: bold; }
+        .device .mac { color: #666; font-size: 0.8em; margin-top: 3px; }
+        .device .seen { color: #444; font-size: 0.8em; margin-top: 2px; }
+        .signal { padding: 5px 10px; border-radius: 4px; font-size: 0.85em; font-weight: bold; white-space: nowrap; text-align: center; min-width: 80px; }
+        .signal.threat { background: #ff000033; color: #ff4444; border: 1px solid #ff4444; }
+        .signal.warning { background: #ffaa0033; color: #ffaa00; border: 1px solid #ffaa00; }
+        .signal.safe { background: #00ff8822; color: #00ff88; border: 1px solid #00ff8866; }
+        .alert { background: #ff000011; border: 1px solid #ff4444; border-radius: 6px; padding: 14px; margin-bottom: 10px; }
+        .alert .alert-title { color: #ff4444; font-weight: bold; font-size: 1em; margin-bottom: 6px; }
+        .alert .alert-detail { color: #aaa; font-size: 0.85em; line-height: 1.6; }
+        .full-width { grid-column: 1 / -1; max-height: none; }
+        .no-data { color: #333; font-size: 0.95em; text-align: center; padding: 30px; }
+        .pulse { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .desc { background: #111; border: 1px solid #00ff8822; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; color: #888; font-size: 0.85em; line-height: 1.7; text-align: center; }
+        .desc span { color: #00ff88; }
+        .badge { display: inline-block; font-size: 0.7em; padding: 2px 6px; border-radius: 3px; margin-left: 6px; vertical-align: middle; }
+        .badge.wifi { background: #00ff8822; color: #00ff88; border: 1px solid #00ff8844; }
+        .badge.ble { background: #4444ff22; color: #6699ff; border: 1px solid #4444ff44; }
+        .scanner-input { background: #0a0a0a; border: 1px solid #00ff8844; color: #00ff88; font-family: 'Courier New', monospace; font-size: 0.9em; padding: 10px; border-radius: 4px; outline: none; }
+        .scanner-input:focus { border-color: #00ff88; }
+        #countyResults div:hover { background: #00ff8811; }
+        audio { filter: invert(1) hue-rotate(100deg); width: 100%; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h1>⬡ PHORVEX SCANNER</h1>
+    <p class="subtitle">NETWORK THREAT DETECTION SYSTEM</p>
+    <p class="tagline">Real-time WiFi · Bluetooth LE · Smart threat detection · Live emergency scanner</p>
+
+    <div class="desc">
+        Built with an <span>M5StickC Plus 2 (ESP32)</span> scanning nearby WiFi and Bluetooth signals live.
+        Devices are classified as <span style="color:#00ff88">✅ SAFE</span>, <span style="color:#ffaa00">⚠️ WARNING</span>, or <span style="color:#ff4444">🚨 THREAT</span> based on proximity, repetition, and identity.
+    </div>
+
+    <div class="stats">
+        <div class="stat"><div class="num" id="totalWifi">0</div><div class="label">WiFi DEVICES</div></div>
+        <div class="stat"><div class="num" id="totalBle" style="color:#6699ff">0</div><div class="label">BLE DEVICES</div></div>
+        <div class="stat"><div class="num" id="totalAlerts" style="color:#ff4444">0</div><div class="label">ACTIVE THREATS</div></div>
+        <div class="stat"><div class="num pulse">●</div><div class="label">SCANNING LIVE</div></div>
+    </div>
+
+    <div class="grid">
+        <div class="panel">
+            <h2>📡 NEARBY WiFi <span class="badge wifi">802.11</span></h2>
+            <div id="deviceList"><p class="no-data">Scanning...</p></div>
+        </div>
+        <div class="panel ble">
+            <h2>📶 BLUETOOTH LE <span class="badge ble">BLE</span></h2>
+            <div id="bleList"><p class="no-data">Scanning...</p></div>
+        </div>
+        <div class="panel full-width">
+            <h2>🚨 THREAT ALERTS</h2>
+            <div id="alertList"><p class="no-data">No threats detected</p></div>
+        </div>
+        <div class="panel full-width">
+            <h2>🔊 LIVE POLICE SCANNER</h2>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
+                <input id="countySearch" type="text" placeholder="Search county (e.g. Hillsborough FL, Wayne MI)..."
+                    oninput="searchCounty(this.value)" class="scanner-input" style="flex:1; min-width:200px;" />
+                <input id="manualFeed" type="text" placeholder="Or paste Broadcastify feed ID..."
+                    class="scanner-input" style="width:200px;" />
+                <button onclick="loadManualFeed()"
+                    style="background:#00ff8822; border:1px solid #00ff88; color:#00ff88; font-family:'Courier New',monospace; padding:10px 16px; border-radius:4px; cursor:pointer;">
+                    LOAD
+                </button>
+                <span id="countyLabel" style="color:#666; font-size:0.8em;">Hillsborough County, FL</span>
+            </div>
+            <div id="countyResults" style="display:none; background:#0a0a0a; border:1px solid #00ff8833; border-radius:4px; margin-bottom:10px; max-height:180px; overflow-y:auto;"></div>
+            <audio id="scannerAudio" controls autoplay>
+                <source id="scannerSource" src="https://broadcastify.cdnstream1.com/39536" type="audio/mpeg">
+                Your browser does not support audio.
+            </audio>
+        </div>
+    </div>
+
+    <script>
+        const scannerFeeds = [
+          // Florida - Real verified feed IDs
+          { county: "Hillsborough County", state: "FL", feedId: "39536" },
+          { county: "Hillsborough County Sheriff", state: "FL", feedId: "45673" },
+          { county: "Pinellas County Fire and EMS", state: "FL", feedId: "34759" },
+          { county: "Pinellas County Clearwater Police", state: "FL", feedId: "25389" },
+          { county: "Pinellas County Largo Police", state: "FL", feedId: "34830" },
+          { county: "Orange County Fire and EMS", state: "FL", feedId: "41064" },
+          { county: "Miami-Dade Fire Rescue", state: "FL", feedId: "30508" },
+          { county: "Miami-Dade Police Dispatch", state: "FL", feedId: "29482" },
+          { county: "Miami-Dade Police Central", state: "FL", feedId: "45596" },
+          { county: "Broward County Sheriff North", state: "FL", feedId: "33485" },
+          { county: "Broward County Fire Rescue", state: "FL", feedId: "38308" },
+          { county: "Broward County Police", state: "FL", feedId: "35455" },
+          { county: "Palm Beach Boca Raton Fire", state: "FL", feedId: "42001" },
+          { county: "Duval Jacksonville Fire", state: "FL", feedId: "41252" },
+          { county: "Polk County Fire Rescue", state: "FL", feedId: "33015" },
+          { county: "Sarasota County Fire", state: "FL", feedId: "18152" },
+          { county: "Sarasota County Sheriff", state: "FL", feedId: "30021" },
+          { county: "Manatee County Fire and EMS", state: "FL", feedId: "26411" },
+          { county: "Manatee County Sheriff", state: "FL", feedId: "45531" },
+          { county: "Pasco County", state: "FL", feedId: "44905" },
+          { county: "Brevard County Fire", state: "FL", feedId: "27888" },
+          { county: "Volusia County Fire and EMS", state: "FL", feedId: "1709" },
+          { county: "Volusia Daytona Beach Police", state: "FL", feedId: "20356" },
+          { county: "Seminole County Fire", state: "FL", feedId: "40010" },
+          { county: "Lee County Fire and EMS", state: "FL", feedId: "2825" },
+          { county: "Collier County Fire and EMS", state: "FL", feedId: "30503" },
+          { county: "Alachua Gainesville Police", state: "FL", feedId: "39282" },
+          { county: "Marion County", state: "FL", feedId: "45746" },
+          { county: "Escambia Pensacola Fire", state: "FL", feedId: "41812" },
+          { county: "Leon County", state: "FL", feedId: "46592" },
+          { county: "Osceola County", state: "FL", feedId: "42102" },
+          { county: "Indian River County Sheriff", state: "FL", feedId: "42146" },
+          { county: "Charlotte County Sheriff", state: "FL", feedId: "29594" },
+          { county: "Monroe Key West Public Safety", state: "FL", feedId: "42174" },
+          { county: "St. Johns County Fire", state: "FL", feedId: "46672" },
+          { county: "Bay County Fire EMS", state: "FL", feedId: "44503" },
+          { county: "Bay County Law Enforcement", state: "FL", feedId: "44509" },
+          { county: "Levy County Public Safety", state: "FL", feedId: "17250" },
+          { county: "Jackson County Fire", state: "FL", feedId: "35218" },
+          { county: "Hamilton County Dispatch", state: "FL", feedId: "30472" },
+          { county: "Baker County Fire", state: "FL", feedId: "31741" },
+          { county: "Columbia Lake City Fire", state: "FL", feedId: "26234" },
+          { county: "Clay County Fire", state: "FL", feedId: "46287" },
+          { county: "Hernando County", state: "FL", feedId: "32436" },
+          // Michigan - Real verified feed IDs
+          { county: "Wayne County Detroit Police Fire", state: "MI", feedId: "41763" },
+          { county: "Wayne County Detroit Police", state: "MI", feedId: "13671" },
+          { county: "Wayne County Detroit Fire", state: "MI", feedId: "18629" },
+          { county: "Wayne County Downriver Public Safety", state: "MI", feedId: "24330" },
+          { county: "Wayne County Public Safety", state: "MI", feedId: "34315" },
+          { county: "Wayne County Dearborn Police Fire", state: "MI", feedId: "43097" },
+          { county: "Oakland County Fire EMS North", state: "MI", feedId: "41486" },
+          { county: "Oakland County Fire EMS South", state: "MI", feedId: "41491" },
+          { county: "Oakland County Fire EMS All", state: "MI", feedId: "41109" },
+          { county: "Macomb County Police Fire EMS", state: "MI", feedId: "34787" },
+          { county: "Macomb County Warren Police Fire", state: "MI", feedId: "41155" },
+          { county: "Kent County Fire and EMS", state: "MI", feedId: "10622" },
+          { county: "Kent Grand Rapids Police Fire", state: "MI", feedId: "32683" },
+          { county: "Genesee County Fire", state: "MI", feedId: "7792" },
+          { county: "Genesee County EMS", state: "MI", feedId: "7791" },
+          { county: "Genesee Flint City Fire", state: "MI", feedId: "7815" },
+          { county: "Washtenaw County Police Fire", state: "MI", feedId: "32245" },
+          { county: "Ingham Greater Lansing Public Safety", state: "MI", feedId: "41557" },
+          { county: "Ingham County Fire and EMS", state: "MI", feedId: "41561" },
+          { county: "Kalamazoo County Fire MSP", state: "MI", feedId: "31502" },
+          { county: "Muskegon County Police", state: "MI", feedId: "39640" },
+          { county: "Muskegon County Fire", state: "MI", feedId: "34829" },
+          { county: "Saginaw County Police Fire", state: "MI", feedId: "42236" },
+          { county: "St. Clair County Police Fire EMS", state: "MI", feedId: "30088" },
+          { county: "Monroe County Sheriff Police Fire", state: "MI", feedId: "23096" },
+          { county: "Bay County Public Safety", state: "MI", feedId: "43376" },
+          { county: "Marquette County Public Safety", state: "MI", feedId: "23343" },
+          { county: "Delta County Law Fire EMS", state: "MI", feedId: "6882" },
+          { county: "Chippewa Eastern UP Public Safety", state: "MI", feedId: "10911" },
+          { county: "Livingston County Police Fire EMS", state: "MI", feedId: "30114" },
+          { county: "Jackson County Public Safety", state: "MI", feedId: "30589" },
+          { county: "Ionia County Sheriff Fire EMS", state: "MI", feedId: "5266" },
+          { county: "Isabella County Police Fire", state: "MI", feedId: "21385" },
+          { county: "Barry County Sheriff Fire EMS", state: "MI", feedId: "5849" },
+          { county: "Allegan County Police Fire EMS", state: "MI", feedId: "3503" },
+          { county: "Ottawa County Public Safety", state: "MI", feedId: "29198" },
+          { county: "Berrien County Law Fire", state: "MI", feedId: "15698" },
+          { county: "Branch County Public Safety", state: "MI", feedId: "39245" },
+          { county: "Hillsdale County Public Safety", state: "MI", feedId: "39042" },
+          { county: "Lenawee County Police Fire", state: "MI", feedId: "35207" },
+          { county: "Eaton County Public Service", state: "MI", feedId: "20954" },
+          { county: "Clinton Gratiot Montcalm Fire EMS", state: "MI", feedId: "24616" },
+          { county: "Gratiot County Police Fire", state: "MI", feedId: "5094" },
+          { county: "Montcalm County Police Fire", state: "MI", feedId: "40914" },
+          { county: "Lapeer County Fire EMS", state: "MI", feedId: "5980" },
+          { county: "Shiawassee County Fire EMS", state: "MI", feedId: "19856" },
+          { county: "Shiawassee County Police", state: "MI", feedId: "22578" },
+          { county: "Sanilac County Police Fire EMS", state: "MI", feedId: "33255" },
+          { county: "Tuscola County", state: "MI", feedId: "10428" },
+          { county: "Huron County Fire EMS", state: "MI", feedId: "17927" },
+          { county: "Mason County Fire Sheriff EMS", state: "MI", feedId: "3157" },
+          { county: "Newaygo County Public Safety", state: "MI", feedId: "23336" },
+          { county: "Oceana County Fire EMS", state: "MI", feedId: "39700" },
+          { county: "Manistee County Public Safety", state: "MI", feedId: "44058" },
+          { county: "Grand Traverse County Public Safety", state: "MI", feedId: "10651" },
+          { county: "Otsego County Sheriff Police MSP", state: "MI", feedId: "25924" },
+          { county: "Emmet County Police Dispatch", state: "MI", feedId: "27762" },
+          { county: "Charlevoix County Public Safety", state: "MI", feedId: "35466" },
+          { county: "Cheboygan County Public Safety", state: "MI", feedId: "40561" },
+          { county: "Antrim County Public Safety", state: "MI", feedId: "46540" },
+          { county: "Kalkaska County Police Fire", state: "MI", feedId: "28121" },
+          { county: "Wexford County Police Fire", state: "MI", feedId: "43545" },
+          { county: "Clare County Police Fire", state: "MI", feedId: "40899" },
+          { county: "Gogebic County Fire EMS", state: "MI", feedId: "18842" },
+          { county: "Houghton Keweenaw Police Fire EMS", state: "MI", feedId: "23517" },
+          { county: "North Central Michigan Counties", state: "MI", feedId: "2783" },
+          { county: "Straits Area Public Safety", state: "MI", feedId: "36056" },
+          { county: "Eastern Upper Peninsula Public Safety", state: "MI", feedId: "10910" },
+          { county: "St. Joseph County Police Fire EMS", state: "MI", feedId: "3671" },
+          { county: "Van Buren County Fire Police", state: "MI", feedId: "11253" },
+          { county: "Leelanau County Public Safety", state: "MI", feedId: "38744" },
+          { county: "Oscoda County Police Fire EMS", state: "MI", feedId: "32597" },
+          { county: "Mackinac County Public Safety", state: "MI", feedId: "40564" },
+          { county: "Presque Isle Public Safety", state: "MI", feedId: "40563" },
+          { county: "Ontonagon County Public Safety", state: "MI", feedId: "40575" },
+          { county: "Menominee County Public Safety", state: "MI", feedId: "46304" },
+        ];
+
+        function searchCounty(val) {
+            const results = document.getElementById('countyResults');
+            if (val.length < 2) { results.style.display = 'none'; return; }
+            const matches = scannerFeeds.filter(f =>
+                f.county.toLowerCase().includes(val.toLowerCase()) ||
+                f.state.toLowerCase().includes(val.toLowerCase())
+            );
+            if (matches.length === 0) {
+                results.style.display = 'block';
+                results.innerHTML = '<div style="padding:8px 12px; color:#666; font-size:0.85em;">No results — try entering a feed ID manually</div>';
+                return;
+            }
+            results.style.display = 'block';
+            results.innerHTML = matches.map(f => `
+                <div onclick="selectFeed('${f.feedId}','${f.county}, ${f.state}')"
+                     style="padding:8px 12px; cursor:pointer; color:#00ff88; font-size:0.85em; border-bottom:1px solid #00ff8811;">
+                    ${f.county} — ${f.state}
+                </div>`).join('');
+        }
+
+        function selectFeed(feedId, label) {
+            const audio = document.getElementById('scannerAudio');
+            document.getElementById('scannerSource').src = 'https://broadcastify.cdnstream1.com/' + feedId;
+            document.getElementById('countyLabel').textContent = label;
+            document.getElementById('countyResults').style.display = 'none';
+            document.getElementById('countySearch').value = '';
+            audio.load();
+            audio.play();
+        }
+
+        function loadManualFeed() {
+            const feedId = document.getElementById('manualFeed').value.trim();
+            if (!feedId) return;
+            const audio = document.getElementById('scannerAudio');
+            document.getElementById('scannerSource').src = 'https://broadcastify.cdnstream1.com/' + feedId;
+            document.getElementById('countyLabel').textContent = 'Custom Feed: ' + feedId;
+            document.getElementById('manualFeed').value = '';
+            audio.load();
+            audio.play();
+        }
+
+        function threatClass(threat) {
+            if (threat === 'threat') return 'threat';
+            if (threat === 'warning') return 'warning';
+            return 'safe';
+        }
+
+        function threatLabel(threat) {
+            if (threat === 'threat') return '🚨 THREAT';
+            if (threat === 'warning') return '⚠️ WARN';
+            return '✅ SAFE';
+        }
+
+        function timeSince(ts) {
+            const s = Math.floor(Date.now()/1000 - ts);
+            if (s < 60) return s + 's ago';
+            return Math.floor(s/60) + 'm ago';
+        }
+
+        function update() {
+            fetch('/api/devices')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('totalWifi').textContent = data.devices.length;
+                    document.getElementById('totalBle').textContent = data.ble_devices.length;
+                    document.getElementById('totalAlerts').textContent = data.alerts.length;
+
+                    const order = {threat:0, warning:1, safe:2};
+
+                    const devList = document.getElementById('deviceList');
+                    devList.innerHTML = data.devices.length === 0 ? '<p class="no-data">Scanning...</p>' :
+                        data.devices.sort((a,b) => order[a.threat]-order[b.threat]).map(d => `
+                            <div class="device">
+                                <div>
+                                    <div class="ssid">${d.ssid || '(hidden network)'}</div>
+                                    <div class="mac">${d.mac}</div>
+                                    <div class="seen">seen ${d.count}x · ${timeSince(d.lastSeen)}</div>
+                                </div>
+                                <span class="signal ${threatClass(d.threat)}">${threatLabel(d.threat)}<br><small>${d.rssi} dBm</small></span>
+                            </div>`).join('');
+
+                    const bleList = document.getElementById('bleList');
+                    bleList.innerHTML = data.ble_devices.length === 0 ? '<p class="no-data">Scanning for BLE...</p>' :
+                        data.ble_devices.sort((a,b) => order[a.threat]-order[b.threat]).map(d => `
+                            <div class="device">
+                                <div>
+                                    <div class="ssid">${d.name || '(unknown device)'}</div>
+                                    <div class="mac">${d.mac}</div>
+                                    <div class="seen">seen ${d.count}x · ${timeSince(d.lastSeen)}</div>
+                                </div>
+                                <span class="signal ${threatClass(d.threat)}">${threatLabel(d.threat)}<br><small>${d.rssi} dBm</small></span>
+                            </div>`).join('');
+
+                    const alertList = document.getElementById('alertList');
+                    alertList.innerHTML = data.alerts.length === 0 ? '<p class="no-data">No threats detected</p>' :
+                        data.alerts.map(a => `
+                            <div class="alert">
+                                <div class="alert-title">⚠ SUSPICIOUS DEVICE DETECTED</div>
+                                <div class="alert-detail">
+                                    Device: ${a.ssid || '(hidden)'}<br>
+                                    MAC: ${a.mac}<br>
+                                    Signal: ${a.rssi} dBm · Flagged at ${a.time}
+                                </div>
+                            </div>`).join('');
+                });
+        }
+
+        setInterval(update, 3000);
+        update();
+    </script>
+</body>
+</html>
